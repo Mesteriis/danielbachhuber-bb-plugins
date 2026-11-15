@@ -205,6 +205,26 @@ push in the same checkout, is logged to bb's server log and tried again five
 minutes later. It never draws the dot. Only a fetch or pull you started by
 clicking shows as a failure.
 
+### Images show the file as it is now
+
+An image open in a file tab, or shown from a file elsewhere in bb, updates
+when the file changes on disk, such as when an agent re-renders a chart. bb
+loads each file from a URL made only from its path, so after a rewrite the
+URL is the same and the browser keeps showing the picture it already has.
+
+The hack asks bb's server for each such image's version every 3 seconds while
+the window is visible, and again when the window regains focus or you click
+bb's Refresh file button. When the version changes, it points the image at
+the same URL with `?bb-hacks-v=<version>` added, which the browser has to
+load again. The version is a short hash of the ETag bb sends, which bb makes
+from the file's contents.
+
+Each check is one `HEAD` request per file on screen, shared between images
+of the same file. bb's server reads and hashes the whole file to answer it,
+so a large image open in a visible window costs one read of it every 3
+seconds. Images from a git revision, which cannot change, and images from
+any other server are left alone.
+
 ### Diff and markdown code blocks start wrapped
 
 A fenced `diff` or `markdown` (or `md`) block in a chat message starts with
@@ -301,6 +321,15 @@ The diff-wrap hack anchors on the code block's own controls:
 | `aria-label="Wrap lines"` with `aria-pressed="false"` | Finding an unwrapped block's toggle |
 | The first `span` in the toggle's header | The block's language label |
 
+
+The fresh-images hack anchors on URLs rather than markup:
+
+| Anchor | Used for |
+| --- | --- |
+| An `<img>` whose `src` is one of bb's live file routes under `/api/v1/` (environment, project, project host, thread storage, thread host, and host files) | Which images can go stale |
+| The `etag` header on a `HEAD` request to that route, or `last-modified` and `content-length` without one | The file's version |
+| `aria-label="Refresh file"` | Checking at once when you click bb's refresh |
+
 No minified class names. If bb changes the toolbar and the anchors stop
 matching, the hack does nothing and bb behaves exactly as it does without it.
 
@@ -331,6 +360,8 @@ matching, the hack does nothing and bb behaves exactly as it does without it.
 | `hacks/checkout-sync/sidebar.ts` | Placing and drawing the indicator in bb's project headers |
 | `hacks/checkout-sync/engine.ts` | The sync loop: polling, passes, observers, cleanup |
 | `hacks/code-block-wrap-diffs/engine.ts` | The sync loop: finding diff and markdown blocks and wrapping each once |
+| `hacks/fresh-file-images/rules.ts` | Pure logic: which image URLs are live files, and the versioned URL |
+| `hacks/fresh-file-images/engine.ts` | The sync loop: finding file images, checking their versions, and swapping the URL |
 | `app.tsx` | Wiring only: registers each hack's content script |
 | `server.ts` | The checkout indicator's RPC, which finds each project's checkout on this machine and runs its sync script after a pull |
 
